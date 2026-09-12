@@ -4,3 +4,7 @@ node_modules/
 .env.*
 !.env.example
 .openai/*.local.*
+dist/
+.venv/
+__pycache__/
+*.py[cod]
