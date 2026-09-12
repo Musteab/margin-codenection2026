@@ -10,7 +10,7 @@
 
 Margin brings university work, part-time shifts, committee responsibilities and personal commitments into one plan. See what fits, understand what needs to change, and know what to do next.
 
-[Ideation boards](docs/ideation.md) · [Technical design](docs/technical-design.md)
+[Open the interactive prototype](https://margin-uc79.mustyyi.chatgpt.site) · [Ideation boards](docs/ideation.md) · [Technical design](docs/technical-design.md)
 
 ## 1. Project Overview
 
@@ -77,6 +77,8 @@ The concept evolved through four decisions:
 | Make the consequences actionable | A warning does not change a deadline, resolve a dependency or create time. | Preparation tasks, what-if previews and specific change proposals explain the next step. |
 
 ## 3. Design & Prototype
+
+**UI Prototype:** [Margin — public interactive demo](https://margin-uc79.mustyyi.chatgpt.site)
 
 The prototype is a responsive, interactive interface built with HTML, CSS and JavaScript. Its fictional student scenario supports source review, workload calculations, what-if previews, approved changes, pending handovers and undo. Live extraction, account connections, persistence and a general-purpose scheduling engine are planned for the building phase.
 
