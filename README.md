@@ -78,11 +78,13 @@ The concept evolved through four decisions:
 
 ## 3. Design & Prototype
 
-The prototype phase focuses on the intended interface. Live extraction, calendar integration and scheduling logic are planned for the building phase.
+The prototype is a responsive, interactive interface built with HTML, CSS and JavaScript. Its fictional student scenario supports source review, workload calculations, what-if previews, approved changes, pending handovers and undo. Live extraction, account connections, persistence and a general-purpose scheduling engine are planned for the building phase.
 
 ### Core Experience
 
-**Add your life → review commitments → see your calendar → preview a change → rebalance → act.**
+**Add your commitments → see your week → make room.**
+
+A first-visit introduction explains the purpose of the app and offers an optional guided sample. Students can exit the tour at any point or replay it from the More menu. The planner has three primary destinations: My week, Add stuff and Make room.
 
 | Screen | Interaction |
 |---|---|
@@ -95,7 +97,7 @@ The prototype phase focuses on the intended interface. Live extraction, calendar
 | **Updated plan** | Follow a mobile agenda, undo a change or update remaining work. |
 | **Personal settings** | Adjust life spaces, availability, work patterns and recovery preferences. |
 
-On desktop, the calendar is paired with life-space filters and a focused “Needs attention” panel. On mobile, today's agenda and next actions take priority. Important statuses use text as well as colour, and essential actions have an alternative to dragging.
+The daily agenda and next action take priority on both desktop and mobile. The full calendar, semester estimates and personal check-ins are available when needed, rather than competing for attention on the main screen. Cinematic video and artwork surround stationary content; short transitions and confirmation feedback preserve the visual identity without complicating the controls. Motion can be paused and reduced-motion preferences are respected. Important statuses use text as well as colour, and essential actions do not require dragging. The [design evolution](docs/design-direction.md) records the feedback and resulting simplification.
 
 ### Illustrative Planning Scenario
 

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080a0f">
+  <meta name="description" content="Margin brings your semester, work and life into one calendar, with room to recover. Interactive CodeNection prototype by uc-7-9.">
+  <title>Margin — Make room for life</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23c1fa72'/%3E%3Cpath d='M7 24V8h4l5 9 5-9h4v16h-4V15l-5 8-5-8v9z' fill='%23080a0f'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/cinema.css">
+  <link rel="stylesheet" href="/scenes-decisions.css">
+  <link rel="stylesheet" href="/scenes-calendar.css">
+<link rel="stylesheet" href="/scenes-inbox.css">
+<link rel="stylesheet" href="/scenes-personal-calm.css">
+<link rel="stylesheet" href="/calm.css">
+<link rel="stylesheet" href="/soul.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="product-atmosphere" aria-hidden="true">
+    <img class="atmosphere-art" src="/assets/margin-portal.png" alt="">
+    <video class="atmosphere-film" muted loop playsinline preload="metadata" poster="/assets/margin-motion-poster.jpg"><source src="/assets/margin-motion-web.mp4" type="video/mp4"></video>
+    <div class="atmosphere-shade"></div>
+  </div>
+  <a class="skip" href="#main">Skip to your plan</a>
+  <div id="app"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="modal"></dialog>
+</body>
+</html>
