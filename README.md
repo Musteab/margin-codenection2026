@@ -1,9 +1,9 @@
 # Pace by uc-7-9
 
-- **Team:** [Member 1], [Member 2], [Member 3], [Member 4]
+- **Team:** Colin Leong Hong Seng, Mustafe Abdilahi Ahmed, Chan Xiang Wei, Khelvinjit Singh
 - **Problem Statement:** Beating the Burnout (Lifestyle Track): Stress & Workload Manager
 - **Video Presentation:** [Unlisted YouTube link]
-- **Presentation Slides:** [Public link]
+- **Presentation Slides:** https://canva.link/ikjdhvzkfpx4afg
 
 > Replace the bracketed team, mentor, prototype, and presentation details with the final information before submission.
 
