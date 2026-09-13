@@ -1,7 +1,7 @@
-# Pace by [Team Name]
+# Pace by uc-7-9
 
 - **Team:** [Member 1], [Member 2], [Member 3], [Member 4]
-- **Problem Statement:** Lifestyle Track — Beating the Burnout: Stress & Workload Manager
+- **Problem Statement:** Beating the Burnout (Lifestyle Track): Stress & Workload Manager
 - **Video Presentation:** [Unlisted YouTube link]
 - **Presentation Slides:** [Public link]
 
@@ -33,7 +33,7 @@ Tools such as **Google Calendar** are useful for showing when events happen, but
 
 #### Planned build-phase features
 
-- **Capacity snapshot:** an explainable weekly figure based on required hours versus genuinely available hours—not a medical burnout score.
+- **Capacity snapshot:** an explainable weekly figure based on required hours versus genuinely available hours, not a medical burnout score.
 - **Load-by-dimension view:** editable mental, physical, social, and administrative demand alongside time demand.
 - **Rebalance proposals:** compare moving, splitting, batching, postponing, or requesting help, with the effect of each option shown before approval.
 - **Recovery protection:** reserve sleep, meals, exercise, downtime, or social connection as real planning constraints rather than leftover time.
@@ -104,7 +104,7 @@ mindmap
       Approval and undo
 ```
 
-The map connects each part of student life to the information Pace needs and the actions it can propose. It helped us separate *life spaces*—where a responsibility comes from—from *load dimensions*—what that responsibility demands from the student.
+The map connects each part of student life to the information Pace needs and the actions it can propose. It helped us separate *life spaces* (where a responsibility comes from) from *load dimensions* (what that responsibility demands from the student).
 
 #### Problem tree
 
@@ -181,16 +181,18 @@ This consolidation established the prototype sequence: **enter commitments → v
 
 ## 3. Design & Prototype
 
-**UI Prototype:** [Public Figma, Canva, Netlify, Vercel, or other prototype link]
+**UI Prototype:** https://musteab.github.io/margin-codenection2026/
+
+The link opens a live, clickable build of the planner. It runs on seeded sample data in the browser so that reviewers do not depend on a hosted API being awake; the FastAPI service and PostgreSQL schema described in section 5 are what the planner runs against locally.
 
 The current working prototype covers the core flow end to end:
 
-1. **Overview** — Summarises saved commitments, upcoming deadlines, study pace, and the next seven days.
-2. **Plan** — Sets a repeatable daily study block and allows individual days to be moved or skipped.
-3. **Calendar** — Combines academic, social, extracurricular, and personal commitments in one weekly view.
-4. **Classes** — Shows each subject, assessment, weighting, topic range, and due date.
-5. **Clubs** — Keeps weekly meetings and standalone events visible beside academic work.
-6. **Edit plan** — Adds and updates subjects, classes, clubs, events, and tasks, including recurring items and TXT class imports.
+1. **Overview:** summarises saved commitments, upcoming deadlines, study pace, and the next seven days.
+2. **Plan:** sets a repeatable daily study block and allows individual days to be moved or skipped.
+3. **Calendar:** combines academic, social, extracurricular, and personal commitments in one weekly view.
+4. **Classes:** shows each subject, assessment, weighting, topic range, and due date.
+5. **Clubs:** keeps weekly meetings and standalone events visible beside academic work.
+6. **Edit plan:** adds and updates subjects, classes, clubs, events, and tasks, including recurring items and TXT class imports.
 
 Before submission, the public prototype link will be tested in an incognito window. The presentation will include 4–8 annotated screenshots covering the sequence above, including a study-session conflict and its resolution.
 
@@ -221,7 +223,7 @@ Pace is not another to-do list with a wellness quote added on top. Its central t
 - **Commitment preview:** before saying yes to a new shift or event, a student can see what would be displaced and whether recovery boundaries would be broken.
 - **Pending reality:** asking for help does not magically remove a task. The obligation stays visible until another person agrees.
 - **Recovery with consequences:** Pace shows the planning trade-off required to protect downtime instead of offering a context-free reminder.
-- **Explainable infeasibility:** when work cannot fit, Pace says why—for example, “10 hours are required before Friday; 8 compatible hours are available”—rather than claiming an unexplained burnout probability.
+- **Explainable infeasibility:** when work cannot fit, Pace says why, for example “10 hours are required before Friday; 8 compatible hours are available”, rather than claiming an unexplained burnout probability.
 
 ## 5. Technical Architecture & Feasibility
 

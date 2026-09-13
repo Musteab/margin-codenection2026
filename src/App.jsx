@@ -5,6 +5,7 @@ import { ClassTopics, PlannerCalendar, PlannerClubs, PlannerCourses } from './Pl
 import ScheduleCalendar from './ScheduleCalendar'
 import StudyPlanPage from './StudyPlan'
 import { buildStudyPlans } from './studyPlanUtils'
+import { DEMO, demoApi } from './demoApi'
 
 const Icon = ({ name, size = 20, stroke = 1.8 }) => {
   const paths = {
@@ -26,6 +27,8 @@ const navItems = [
 ]
 
 async function api(path, options = {}) {
+  // the public prototype build ships without the FastAPI service behind it
+  if (DEMO) return demoApi(path, options)
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) } })
   if (!response.ok) {
     const body = await response.json().catch(() => null)
