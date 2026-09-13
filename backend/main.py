@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from datetime import date, date as CalendarDate, time
+from datetime import date, date as CalendarDate, time, timedelta
 from typing import Generator
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, Time, create_engine, select, text
+from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, Time, UniqueConstraint, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 
@@ -108,6 +108,7 @@ class Event(Base):
     end_time: Mapped[time] = mapped_column(Time)
     club_id: Mapped[int | None] = mapped_column(ForeignKey("planner_clubs.id", ondelete="SET NULL"), nullable=True)
     club: Mapped[Club | None] = relationship(back_populates="events")
+    study_reschedules: Mapped[list[StudyPlanReschedule]] = relationship(back_populates="event", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -123,6 +124,51 @@ class Task(Base):
     class_id: Mapped[int | None] = mapped_column(ForeignKey("planner_classes.id", ondelete="SET NULL"), nullable=True)
     club_id: Mapped[int | None] = mapped_column(ForeignKey("planner_clubs.id", ondelete="SET NULL"), nullable=True)
     event_id: Mapped[int | None] = mapped_column(ForeignKey("planner_events.id", ondelete="SET NULL"), nullable=True)
+
+
+class StudyPlan(Base):
+    __tablename__ = "planner_study_plan"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    minutes_per_day: Mapped[int] = mapped_column(Integer, default=30)
+    start_time: Mapped[time] = mapped_column(Time, default=lambda: time(20))
+    subject_id: Mapped[int | None] = mapped_column(ForeignKey("planner_subjects.id", ondelete="SET NULL"), nullable=True)
+    topic_id: Mapped[int | None] = mapped_column(ForeignKey("planner_topics.id", ondelete="SET NULL"), nullable=True)
+    subject: Mapped[Subject | None] = relationship()
+    topic: Mapped[Topic | None] = relationship()
+    day_overrides: Mapped[list[StudyPlanDay]] = relationship(back_populates="study_plan", cascade="all, delete-orphan")
+    reschedules: Mapped[list[StudyPlanReschedule]] = relationship(back_populates="study_plan", cascade="all, delete-orphan")
+
+
+class StudyPlanDay(Base):
+    __tablename__ = "planner_study_plan_days"
+    __table_args__ = (UniqueConstraint("study_plan_id", "day", name="planner_study_plan_day_unique"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    study_plan_id: Mapped[int] = mapped_column(ForeignKey("planner_study_plan.id", ondelete="CASCADE"))
+    day: Mapped[str] = mapped_column(String(16))
+    is_absent: Mapped[bool] = mapped_column(Boolean, default=False)
+    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    study_plan: Mapped[StudyPlan] = relationship(back_populates="day_overrides")
+
+
+class StudyPlanReschedule(Base):
+    __tablename__ = "planner_study_plan_reschedules"
+    __table_args__ = (UniqueConstraint("study_plan_id", "source_date", name="planner_study_plan_reschedule_source_unique"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    study_plan_id: Mapped[int] = mapped_column(ForeignKey("planner_study_plan.id", ondelete="CASCADE"))
+    event_id: Mapped[int] = mapped_column(ForeignKey("planner_events.id", ondelete="CASCADE"))
+    source_date: Mapped[date] = mapped_column(Date)
+    target_date: Mapped[date] = mapped_column(Date)
+    start_time: Mapped[time] = mapped_column(Time)
+    minutes_per_day: Mapped[int] = mapped_column(Integer)
+    subject_id: Mapped[int | None] = mapped_column(ForeignKey("planner_subjects.id", ondelete="SET NULL"), nullable=True)
+    topic_id: Mapped[int | None] = mapped_column(ForeignKey("planner_topics.id", ondelete="SET NULL"), nullable=True)
+    subject: Mapped[Subject | None] = relationship()
+    topic: Mapped[Topic | None] = relationship()
+    study_plan: Mapped[StudyPlan] = relationship(back_populates="reschedules")
+    event: Mapped[Event] = relationship(back_populates="study_reschedules")
 
 
 class AssessmentInput(BaseModel):
@@ -185,6 +231,12 @@ class ClubInput(BaseModel):
         return self
 
 
+class StudyRescheduleInput(BaseModel):
+    sourceDate: date
+    targetDate: date
+    startTime: time
+
+
 class EventInput(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     date: date
@@ -192,6 +244,7 @@ class EventInput(BaseModel):
     startTime: time
     endTime: time
     clubId: int | None = None
+    studyReschedules: list[StudyRescheduleInput] = []
 
     @field_validator("endDate", mode="before")
     @classmethod
@@ -236,6 +289,28 @@ class TaskInput(BaseModel):
 
 class SubjectInput(BaseModel):
     name: str = Field(min_length=1, max_length=160)
+
+
+class StudyPlanInput(BaseModel):
+    minutesPerDay: int = Field(ge=15, le=180)
+    startTime: time
+    subjectId: int | None = None
+    topicId: int | None = None
+
+    @field_validator("subjectId", "topicId", mode="before")
+    @classmethod
+    def blank_study_content_is_none(cls, value: object) -> object:
+        return None if value == "" else value
+
+
+class StudyPlanDayInput(BaseModel):
+    isAbsent: bool = False
+    startTime: time | None = None
+
+    @field_validator("startTime", mode="before")
+    @classmethod
+    def blank_start_time_is_none(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -310,6 +385,266 @@ def task_payload(item: Task) -> dict:
         "clubId": item.club_id,
         "eventId": item.event_id,
     }
+
+
+def study_content_payload(subject: Subject | None, topic: Topic | None) -> dict:
+    return {
+        "subjectId": subject.id if subject else None,
+        "subjectName": subject.name if subject else "",
+        "topicId": topic.id if topic else None,
+        "topicNumber": topic.number if topic else None,
+        "topicTitle": topic.title if topic else "",
+    }
+
+
+def study_plan_payload(item: StudyPlan | None) -> dict:
+    if not item:
+        return {"minutesPerDay": 30, "startTime": "20:00", "dayOverrides": [], "studyReschedules": [], **study_content_payload(None, None)}
+    return {
+        "minutesPerDay": item.minutes_per_day,
+        "startTime": display_time(item.start_time),
+        **study_content_payload(item.subject, item.topic),
+        "dayOverrides": [
+            {"day": override.day, "isAbsent": override.is_absent, "startTime": display_time(override.start_time) or ""}
+            for override in sorted(item.day_overrides, key=lambda override: WEEKDAYS.index(override.day))
+        ],
+        "studyReschedules": [
+            {
+                "id": reschedule.id,
+                "eventId": reschedule.event_id,
+                "sourceDate": reschedule.source_date.isoformat(),
+                "targetDate": reschedule.target_date.isoformat(),
+                "startTime": display_time(reschedule.start_time),
+                "minutesPerDay": reschedule.minutes_per_day,
+                **study_content_payload(reschedule.subject, reschedule.topic),
+            }
+            for reschedule in sorted(item.reschedules, key=lambda entry: (entry.target_date, entry.start_time, entry.id))
+        ],
+    }
+
+
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+def minutes_since_midnight(value: time) -> int:
+    return value.hour * 60 + value.minute
+
+
+def ranges_overlap(start: int, end: int, other_start: int, other_end: int) -> bool:
+    return start < other_end and end > other_start
+
+
+def event_time_range_for_date(
+    start_date: date, end_date: date | None, start_time: time, end_time: time, on_date: date
+) -> tuple[int, int] | None:
+    final_date = end_date or start_date
+    if on_date < start_date or on_date > final_date:
+        return None
+    if start_date == final_date:
+        return minutes_since_midnight(start_time), minutes_since_midnight(end_time)
+    if on_date == start_date:
+        return minutes_since_midnight(start_time), 24 * 60
+    if on_date == final_date:
+        return 0, minutes_since_midnight(end_time)
+    return 0, 24 * 60
+
+
+def study_session_for_date(item: StudyPlan, on_date: date, moved_source_dates: set[date] | None = None) -> tuple[time, int] | None:
+    if moved_source_dates and on_date in moved_source_dates:
+        return None
+    day = WEEKDAYS[on_date.weekday()]
+    override = next((entry for entry in item.day_overrides if entry.day == day), None)
+    if override and override.is_absent:
+        return None
+    return (override.start_time if override and override.start_time else item.start_time, item.minutes_per_day)
+
+
+def study_conflict(
+    db: Session, day: str, start_time: time, minutes: int, on_date: date | None = None, exclude_event_id: int | None = None
+) -> str | None:
+    start = minutes_since_midnight(start_time)
+    end = start + minutes
+    if end > 24 * 60:
+        return "A study block must finish by midnight"
+
+    def overlaps(other_start: time, other_end: time) -> bool:
+        return ranges_overlap(start, end, minutes_since_midnight(other_start), minutes_since_midnight(other_end))
+
+    for item in db.scalars(select(ClassSchedule).where(ClassSchedule.day == day)).all():
+        if overlaps(item.start_time, item.end_time):
+            return f"{item.subject} class"
+    for item in db.scalars(select(Club).where(Club.has_weekly_meeting.is_(True), Club.day == day)).all():
+        if item.start_time and item.end_time and overlaps(item.start_time, item.end_time):
+            return f"{item.name} meeting"
+    for item in db.scalars(select(Task)).all():
+        if not item.start_time or not item.end_time:
+            continue
+        is_matching_day = item.is_recurring and item.recurring_day == day
+        if not item.is_recurring and item.task_date:
+            is_matching_day = is_matching_day or (item.task_date == on_date if on_date else item.task_date >= date.today() and WEEKDAYS[item.task_date.weekday()] == day)
+        if is_matching_day and overlaps(item.start_time, item.end_time):
+            return item.title
+    for item in db.scalars(select(Event)).all():
+        if exclude_event_id is not None and item.id == exclude_event_id:
+            continue
+        event_end = item.end_date or item.start_date
+        if event_end < date.today():
+            continue
+        if on_date:
+            event_range = event_time_range_for_date(item.start_date, item.end_date, item.start_time, item.end_time, on_date)
+            if event_range and ranges_overlap(start, end, *event_range):
+                return item.name
+            continue
+        cursor = item.start_date
+        while cursor <= event_end:
+            if WEEKDAYS[cursor.weekday()] == day:
+                event_range = event_time_range_for_date(item.start_date, item.end_date, item.start_time, item.end_time, cursor)
+                if event_range and ranges_overlap(start, end, *event_range):
+                    return item.name
+            cursor += timedelta(days=1)
+    return None
+
+
+def event_study_conflicts(db: Session, data: EventInput, event_id: int | None = None) -> tuple[StudyPlan | None, list[dict]]:
+    item = db.scalar(select(StudyPlan).limit(1))
+    if not item:
+        return None, []
+    moved_by_other_events = {entry.source_date for entry in item.reschedules if entry.event_id != event_id}
+    conflicts = []
+    final_date = data.endDate or data.date
+    cursor = data.date
+    while cursor <= final_date:
+        if cursor >= date.today():
+            study_session = study_session_for_date(item, cursor, moved_by_other_events)
+            event_range = event_time_range_for_date(data.date, data.endDate, data.startTime, data.endTime, cursor)
+            if study_session and event_range:
+                study_start, minutes = study_session
+                start = minutes_since_midnight(study_start)
+                if ranges_overlap(start, start + minutes, *event_range):
+                    conflicts.append({"sourceDate": cursor.isoformat(), "startTime": display_time(study_start), "minutesPerDay": minutes})
+        cursor += timedelta(days=1)
+    return item, conflicts
+
+
+def validate_event_study_reschedules(
+    db: Session, plan: StudyPlan | None, data: EventInput, event_id: int | None, conflicts: list[dict]
+) -> None:
+    if not plan:
+        return
+    supplied = {entry.sourceDate: entry for entry in data.studyReschedules}
+    if len(supplied) != len(data.studyReschedules):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Choose one replacement study session for each affected date")
+    conflict_dates = {date.fromisoformat(entry["sourceDate"]) for entry in conflicts}
+    missing_dates = conflict_dates - set(supplied)
+    if missing_dates:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "This event overlaps your study session. Choose a replacement date and time, or cancel.",
+                "studyConflicts": conflicts,
+            },
+        )
+    extra_dates = set(supplied) - conflict_dates
+    if extra_dates:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="One of the replacement study sessions no longer needs to be moved")
+    if not conflicts:
+        return
+
+    other_reschedules = [entry for entry in plan.reschedules if entry.event_id != event_id]
+    moved_source_dates = {entry.source_date for entry in other_reschedules} | set(supplied)
+    planned_replacements: list[StudyRescheduleInput] = []
+    for source_date in sorted(conflict_dates):
+        replacement = supplied[source_date]
+        if replacement.targetDate == replacement.sourceDate:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Choose another date for the replacement study session")
+        if replacement.targetDate < date.today():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Choose a future date for the replacement study session")
+        replacement_start = minutes_since_midnight(replacement.startTime)
+        replacement_end = replacement_start + plan.minutes_per_day
+        if replacement_end > 24 * 60:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="A replacement study session must finish by midnight")
+        replacement_day = WEEKDAYS[replacement.targetDate.weekday()]
+        conflict = study_conflict(db, replacement_day, replacement.startTime, plan.minutes_per_day, on_date=replacement.targetDate, exclude_event_id=event_id)
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"Your replacement study session conflicts with {conflict}. Choose another time.")
+        event_range = event_time_range_for_date(data.date, data.endDate, data.startTime, data.endTime, replacement.targetDate)
+        if event_range and ranges_overlap(replacement_start, replacement_end, *event_range):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Your replacement study session conflicts with this event. Choose another date or time.")
+        regular_session = study_session_for_date(plan, replacement.targetDate, moved_source_dates)
+        if regular_session:
+            regular_start, regular_minutes = regular_session
+            if ranges_overlap(replacement_start, replacement_end, minutes_since_midnight(regular_start), minutes_since_midnight(regular_start) + regular_minutes):
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Your replacement study session conflicts with the regular study block on that date. Choose another time.")
+        for existing in other_reschedules:
+            if existing.target_date == replacement.targetDate and ranges_overlap(
+                replacement_start, replacement_end, minutes_since_midnight(existing.start_time), minutes_since_midnight(existing.start_time) + existing.minutes_per_day
+            ):
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Your replacement study session conflicts with another moved study session. Choose another time.")
+        for planned in planned_replacements:
+            if planned.targetDate == replacement.targetDate and ranges_overlap(
+                replacement_start, replacement_end, minutes_since_midnight(planned.startTime), minutes_since_midnight(planned.startTime) + plan.minutes_per_day
+            ):
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The replacement study sessions overlap. Choose different times.")
+        planned_replacements.append(replacement)
+
+
+def save_event_study_reschedules(db: Session, plan: StudyPlan | None, event: Event, data: EventInput) -> None:
+    if not plan:
+        return
+    for existing in list(event.study_reschedules):
+        db.delete(existing)
+    db.flush()
+    for replacement in data.studyReschedules:
+        db.add(
+            StudyPlanReschedule(
+                study_plan_id=plan.id,
+                event_id=event.id,
+                source_date=replacement.sourceDate,
+                target_date=replacement.targetDate,
+                start_time=replacement.startTime,
+                minutes_per_day=plan.minutes_per_day,
+                subject_id=plan.subject_id,
+                topic_id=plan.topic_id,
+            )
+        )
+
+
+def ensure_study_plan(db: Session) -> StudyPlan:
+    item = db.scalar(select(StudyPlan).limit(1))
+    if item:
+        return item
+    item = StudyPlan(minutes_per_day=30, start_time=time(20))
+    db.add(item)
+    db.flush()
+    return item
+
+
+def validate_study_content(db: Session, subject_id: int | None, topic_id: int | None) -> None:
+    if subject_id is None:
+        if topic_id is not None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Choose a subject before choosing a topic")
+        return
+    if db.get(Subject, subject_id) is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The selected study subject was not found")
+    if topic_id is None:
+        return
+    topic = db.get(Topic, topic_id)
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The selected study topic was not found")
+    if topic.class_schedule.subject_id != subject_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The selected topic does not belong to that subject")
+
+
+def validate_study_schedule(db: Session, item: StudyPlan, minutes: int, default_start_time: time) -> None:
+    overrides = {override.day: override for override in item.day_overrides}
+    for day in WEEKDAYS:
+        override = overrides.get(day)
+        if override and override.is_absent:
+            continue
+        start_time = override.start_time if override and override.start_time else default_start_time
+        conflict = study_conflict(db, day, start_time, minutes)
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"Your {day} study block conflicts with {conflict}. Move it or mark that day as absent.")
 
 
 def subject_payload(item: Subject) -> dict:
@@ -429,6 +764,10 @@ def prepare_database() -> None:
     Base.metadata.create_all(engine)
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE planner_classes ADD COLUMN IF NOT EXISTS subject_id INTEGER REFERENCES planner_subjects(id) ON DELETE SET NULL"))
+        connection.execute(text("ALTER TABLE planner_study_plan ADD COLUMN IF NOT EXISTS subject_id INTEGER REFERENCES planner_subjects(id) ON DELETE SET NULL"))
+        connection.execute(text("ALTER TABLE planner_study_plan ADD COLUMN IF NOT EXISTS topic_id INTEGER REFERENCES planner_topics(id) ON DELETE SET NULL"))
+        connection.execute(text("ALTER TABLE planner_study_plan_reschedules ADD COLUMN IF NOT EXISTS subject_id INTEGER REFERENCES planner_subjects(id) ON DELETE SET NULL"))
+        connection.execute(text("ALTER TABLE planner_study_plan_reschedules ADD COLUMN IF NOT EXISTS topic_id INTEGER REFERENCES planner_topics(id) ON DELETE SET NULL"))
     with SessionLocal() as db:
         backfill_subject_links(db)
 
@@ -507,7 +846,52 @@ def bootstrap(db: Session = Depends(get_db)) -> dict:
     clubs = db.scalars(select(Club).order_by(Club.name)).all()
     events = db.scalars(select(Event).order_by(Event.start_date, Event.start_time)).all()
     tasks = db.scalars(select(Task).order_by(Task.task_date, Task.start_time, Task.title)).all()
-    return {"subjects": [subject_payload(item) for item in subjects], "classes": [class_payload(item) for item in classes], "clubs": [club_payload(item) for item in clubs], "events": [event_payload(item) for item in events], "tasks": [task_payload(item) for item in tasks]}
+    study_plan = db.scalar(select(StudyPlan).limit(1))
+    return {"subjects": [subject_payload(item) for item in subjects], "classes": [class_payload(item) for item in classes], "clubs": [club_payload(item) for item in clubs], "events": [event_payload(item) for item in events], "tasks": [task_payload(item) for item in tasks], "studyPlan": study_plan_payload(study_plan)}
+
+
+@app.get("/api/study-plan")
+def get_study_plan(db: Session = Depends(get_db)) -> dict:
+    return study_plan_payload(db.scalar(select(StudyPlan).limit(1)))
+
+
+@app.put("/api/study-plan")
+def update_study_plan(data: StudyPlanInput, db: Session = Depends(get_db)) -> dict:
+    item = ensure_study_plan(db)
+    validate_study_content(db, data.subjectId, data.topicId)
+    validate_study_schedule(db, item, data.minutesPerDay, data.startTime)
+    item.minutes_per_day = data.minutesPerDay
+    item.start_time = data.startTime
+    item.subject_id = data.subjectId
+    item.topic_id = data.topicId
+    db.commit()
+    db.refresh(item)
+    return study_plan_payload(item)
+
+
+@app.put("/api/study-plan/days/{day}")
+def update_study_plan_day(day: str, data: StudyPlanDayInput, db: Session = Depends(get_db)) -> dict:
+    if day not in WEEKDAYS:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="day must be a weekday name")
+    item = ensure_study_plan(db)
+    override = next((entry for entry in item.day_overrides if entry.day == day), None)
+    if not data.isAbsent:
+        effective_start_time = data.startTime or item.start_time
+        conflict = study_conflict(db, day, effective_start_time, item.minutes_per_day)
+        if conflict:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"Your {day} study block conflicts with {conflict}. Choose another time or mark that day as absent.")
+    if not data.isAbsent and data.startTime is None:
+        if override:
+            db.delete(override)
+    else:
+        if not override:
+            override = StudyPlanDay(day=day)
+            item.day_overrides.append(override)
+        override.is_absent = data.isAbsent
+        override.start_time = None if data.isAbsent else data.startTime
+    db.commit()
+    db.refresh(item)
+    return study_plan_payload(item)
 
 
 @app.get("/api/classes")
@@ -590,8 +974,12 @@ def list_events(db: Session = Depends(get_db)) -> list[dict]:
 @app.post("/api/events", status_code=status.HTTP_201_CREATED)
 def create_event(data: EventInput, db: Session = Depends(get_db)) -> dict:
     item = Event(name=data.name.strip(), start_date=data.date, start_time=data.startTime, end_time=data.endTime)
+    plan, conflicts = event_study_conflicts(db, data)
+    validate_event_study_reschedules(db, plan, data, None, conflicts)
     apply_event(item, data, db)
     db.add(item)
+    db.flush()
+    save_event_study_reschedules(db, plan, item, data)
     db.commit()
     db.refresh(item)
     return event_payload(item)
@@ -602,7 +990,11 @@ def update_event(event_id: int, data: EventInput, db: Session = Depends(get_db))
     item = db.get(Event, event_id)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    plan, conflicts = event_study_conflicts(db, data, event_id)
+    validate_event_study_reschedules(db, plan, data, event_id, conflicts)
     apply_event(item, data, db)
+    db.flush()
+    save_event_study_reschedules(db, plan, item, data)
     db.commit()
     db.refresh(item)
     return event_payload(item)
