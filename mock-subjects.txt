@@ -1,0 +1,31 @@
+Subject: Data Structures and Algorithms
+Class: Lecture
+Day: Monday
+Start: 09:00
+End: 10:30
+Topics:
+1 | Arrays and algorithm analysis
+2 | Linked lists and stacks
+3 | Queues and recursion
+
+---
+Subject: Data Structures and Algorithms
+Class: Practical
+Day: Wednesday
+Start: 14:00
+End: 16:00
+Topics:
+1 | Array practice
+2 | Linked list implementation
+3 | Stack and queue exercises
+
+---
+Subject: Human Computer Interaction
+Class: Lecture
+Day: Tuesday
+Start: 11:00
+End: 12:30
+Topics:
+1 | Human-centred design
+2 | Usability heuristics
+3 | Interface evaluation
