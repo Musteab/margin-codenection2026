@@ -2,7 +2,7 @@
 
 - **Team:** Colin Leong Hong Seng, Mustafe Abdilahi Ahmed, Chan Xiang Wei, Khelvinjit Singh
 - **Problem Statement:** Beating the Burnout (Lifestyle Track): Stress & Workload Manager
-- **Video Presentation:** [Unlisted YouTube link]
+- **Video Presentation:** [[Unlisted YouTube link]](https://youtu.be/no3zJCBde5c?si=_cwausgRL0rMvriS)
 - **Presentation Slides:** https://canva.link/ikjdhvzkfpx4afg
 
 > Replace the bracketed team, mentor, prototype, and presentation details with the final information before submission.
